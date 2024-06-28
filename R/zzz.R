@@ -14,7 +14,11 @@
   pkgs <- available.packages(repos = repos)
   cran_version <- package_version(pkgs[which(pkgs[,1] == "GGIR"),"Version"])
   local_version <- packageVersion("GGIR")
-  behind_cran <- cran_version > local_version
+  if (length(cran_version) > 0) {
+    behind_cran <- cran_version > local_version
+  } else {
+    behind_cran = FALSE
+  }
   if (interactive()) {
     if (behind_cran) {
       msg <- paste0("A newer version of GGIR is available with bug fixes and new features. [", local_version," --> ", cran_version, "]")
