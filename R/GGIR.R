@@ -320,7 +320,7 @@ GGIR = function(mode = 1:5, datadir = c(), outputdir = c(),
     }
     g.part6(datadir = datadir, metadatadir = metadatadir, f0 = f0, f1 = f1,
             params_general = params_general, params_phyact = params_phyact,
-            params_247 = params_247,
+            params_247 = params_247, params_cleaning = params_cleaning,
             verbose = verbose)
   }
   
@@ -335,7 +335,7 @@ GGIR = function(mode = 1:5, datadir = c(), outputdir = c(),
                           "GGIRversion",  "dupArgValues", "verbose", "is_GGIRread_installed", 
                           "is_read.gt3x_installed", "is_ActCR_installed", 
                           "is_actilifecounts_installed", "rawaccfiles", "is_readxl_installed", 
-                          "checkFormat", "getExt") == FALSE)]
+                          "checkFormat", "getExt", "rawaccfiles_formats") == FALSE)]
   
   config.parameters = mget(LS)
   config.matrix = as.data.frame(createConfigFile(config.parameters, GGIRversion))
@@ -369,7 +369,7 @@ GGIR = function(mode = 1:5, datadir = c(), outputdir = c(),
       g.report.part2(metadatadir = metadatadir, f0 = f0, f1 = f1,
                      maxdur = params_cleaning[["maxdur"]],
                      store.long = store.long, params_output,
-                     verbose = verbose)
+                     verbose = verbose, desiredtz = params_general[["desiredtz"]])
     }
   }
   if (length(which(do.report == 4)) > 0) {

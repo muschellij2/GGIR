@@ -97,16 +97,16 @@ extract_params = function(params_sleep = c(), params_metrics = c(),
           }
           
           # Ignore arguments that are irrelevant or related to deprecated code
-          # Note VvH 7 Dec 2022: I have added closedbout and boutmetric 
-          # because for the time being many groups may still have this in 
+          # Note VvH 7 Dec 2022: I have added closedbout and boutmetric
+          # because for the time being many groups may still have this in
           # their config.csv files. Eventuallythese can be removed here, which will
           # trigger an error for anyone who still uses config file with those arguments.
-          ArgNames2Ignore = c("f0", "f1", "studyname", "datadir", 
+          ArgNames2Ignore = c("f0", "f1", "studyname", "datadir",
                               "outputdir", "do.report", "R_version",
                               "GGIR_version", "GGIRversion", "config_file", "mode",
                               "config_file_in_outputdir", "imputeTimegaps",
-                              "argNames", "dupArgNames","do.sgAccEN", "do.sgAnglex", 
-                              "do.sgAngley", "do.sgAnglez", "frag.classes.spt", "i", 
+                              "argNames", "dupArgNames", "do.sgAccEN", "do.sgAnglex",
+                              "do.sgAngley", "do.sgAnglez", "frag.classes.spt", "i",
                               "isna", "tmp", "vecchar", "dupi", "GGIRread_version",
                               "closedbout", "bout.metric", "sleeplogidnum", "LC_TIME_backup",
                               "constrain2range", "is_readxl_installed")
@@ -187,6 +187,9 @@ extract_params = function(params_sleep = c(), params_metrics = c(),
       } else if (aN %in% expected_phyact_params == TRUE) { # phyact
         params_phyact = update_params(x = params_phyact, aN, input)
       } else if (aN %in% expected_cleaning_params == TRUE) { # cleaning
+        if (aN == "data_masking_strategy") { # account for this parameter name change
+          params_cleaning[["strategy"]] = input[[aN]]
+        }
         params_cleaning = update_params(x = params_cleaning, aN, input)
       } else if (aN %in% expected_output_params == TRUE) { # output
         params_output = update_params(x = params_output, aN, input)
@@ -208,7 +211,7 @@ extract_params = function(params_sleep = c(), params_metrics = c(),
   if (!"output" %in% params2check) params_output = c()
   if (!"general" %in% params2check) params_general = c()
   
-  params = check_params(params_sleep = params_sleep, params_metrics = params_metrics, 
+  params = check_params(params_sleep = params_sleep, params_metrics = params_metrics,
                         params_rawdata = params_rawdata, params_247 = params_247,
                         params_phyact = params_phyact, params_cleaning = params_cleaning,
                         params_output = params_output, params_general = params_general)

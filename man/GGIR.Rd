@@ -74,7 +74,7 @@ GGIR(mode = 1:5,
     List (default = c()).
     External function object to be applied to raw data. See package vignette for detailed tutorial with
     examples on how to use the function embedding:
-    https://cran.r-project.org/package=GGIR/vignettes/ExternalFunction.pdf
+    https://cran.r-project.org/package=GGIR/vignettes/ExternalFunction.html
   }
   \item{verbose}{
     Boolean (default = TRUE).
@@ -355,12 +355,15 @@ GGIR(mode = 1:5,
 
       \item{chunksize}{
         Numeric (default = 1).
-        Value between 0.2 and 1 to specify the size of chunks to be
+        Value to specify the size of chunks to be
         loaded as a fraction of an approximately 12 hour period for auto-calibration
         procedure and as fraction of 24 hour period for the metric calculation, e.g., 
         0.5 equals 6 and 12 hour chunks, respectively. 
         For machines with less than 4Gb of RAM memory or with < 2GB memory per process
-        when using \code{do.parallel = TRUE} a value below 1 is recommended.}
+        when using \code{do.parallel = TRUE} a value below 1 is recommended.
+        The value is constrained by GGIR to not be lower than 0.05. Please note that
+        setting 0.05 will not produce output when 3rd value of parameter windowsizes
+        is 3600.}
 
       \item{dynrange}{
         Numeric (default = NULL).
@@ -430,7 +433,8 @@ GGIR(mode = 1:5,
 
       \item{rmc.unit.time}{
         Character (default = "POSIX").
-        Character with unit of timestamps: "POSIX", "UNIXsec" (seconds since origin, see argument \code{rmc.origin}),
+        Character with unit of timestamps: "POSIX", "UNIXsec" (seconds since origin, 
+        see argument \code{rmc.origin}), "UNIXmsec" (same as UNIXsec but in milliseconds),
         "character", or "ActivPAL" (exotic timestamp format only used in the ActivPAL
         activity monitor).}
 
@@ -510,7 +514,8 @@ GGIR(mode = 1:5,
 
       \item{rmc.noise}{
         Numeric (default = 13).
-        Noise level of acceleration signal in m\emph{g}-units, used when working ad-hoc .csv data formats
+        Noise level of acceleration signal in m\emph{g}-units, used when working 
+        ad-hoc .csv data formats
         using \link{read.myacc.csv}. The \link{read.myacc.csv} does not take rmc.noise as argument,
         but when interacting with \link{GGIR} or \link{g.part1} rmc.noise is used.}
         
@@ -526,6 +531,11 @@ GGIR(mode = 1:5,
         per data block is larger than this fraction then the data block will be imputed
         by lack of movement with gravitational oriationed guessed from most recent
         valid data block. Only applicable to Axivity .cwa data.
+      }
+      \item{nonwear_range_threshold}{
+        Numeric (default 150) used to define maximum value range per axis for non-wear
+        detection, used in combination with brand specific standard deviation per
+        axis.
       }
       
     }
@@ -894,6 +904,16 @@ GGIR(mode = 1:5,
         when value above 1 used as absolute number of valid hours required.
         Do not confuse this argument with argument \code{includedaycrit} which is
         only used in GGIR part 2 and applies to the entire day.}
+        
+      \item{includenightcrit.part5}{
+        Numeric (default = 0).
+        Inclusion criteria used in part 5 for number of valid hours during the 
+        sleep period hours of a day (the night),
+        when value is smaller than or equal to 1 used as fraction of sleep period hours, 
+        when value above 1 used as absolute number of valid hours required.
+        Do not confuse this argument with argument \code{includenightcrit} which is
+        only used in GGIR part 4 and applies to the entire 24 hour window from 
+        noon to noon or 6pm to 6pm.}
 
       \item{segmentWEARcrit.part5}{
         Numeric (default = 0.5).
@@ -952,6 +972,12 @@ GGIR(mode = 1:5,
         the full longsize window. For the 2013 method the longsize window is centered 
         in the centre of the mediumsize window, while in the 2023 method the longsizewindow 
         is aligned with its left edge to the left edge of the mediumsize window.
+      }
+      
+      \item{includecrit.part6}{
+        Numeric (default = c(2/3, 2/3))
+        Vector of two with the minimum fraction of valid data required for day
+        and spt time, respectively. This criteria is only used for circadian rhythm analysis.
       }
     }
   }
@@ -1143,8 +1169,10 @@ GGIR(mode = 1:5,
         the HDCZA algorithm by looking for time segments where the angle of the
         longitudinal sensor axis has an angle relative to the horizontal plane
         between -45 and +45 degrees. And "NotWorn" which is also the same as HDCZA
-        but looks for time segments when the 5 minute rolling average of counts is
-        below 20 per cent of its standard deviation.}
+        but looks for time segments when a rolling average of acceleration
+        magnitude is below 5 per cent of its standard deviation, see 
+        Cookbook vignette in the Annexes of https://wadpac.github.io/GGIR/ 
+        for more detailed guidance on how to use "NotWorn".}
     
       \item{HDCZA_threshold}{
         Numeric (default = c())
@@ -1154,19 +1182,21 @@ GGIR(mode = 1:5,
         et al. 2018 Scientific Report (doi: 10.1038/s41598-018-31266-z). However,
         doing so has not been supported by research yet and is only intended to
         facilitate methodological research, so we advise sticking with the default in
-        line with the publication.
+        line with the publication. Further, if HDCZA_threshold is set to a numeric vector of
+        length 2, e.g. c(10, 15), that will be used as percentile and 
+        multiplier for the above mentioned 6th step.
       }
 
       \item{HASPT.ignore.invalid}{
         Boolean (default = FALSE).
         To indicate whether invalid time segments should be ignored in the
-        Sleep Period Time detection. If \code{FALSE} (default), the imputed 
-        angle or activity metric during the invalid time segments is used 
-        in the Sleep Period Time detection. If \code{TRUE}, invalid time 
-        segments are ignored for the Sleep Period Time detection 
-        (i.e., considered to be out of the Sleep Period Time). 
-        If \code{NA}, then invalid time segments are considered to be no movement
-        segments.
+        heuristic guiders. If \code{FALSE} (default), the imputed 
+        angle or activity metric during the invalid time segments are used.
+        If \code{TRUE}, invalid time segments are ignored (i.e., they cannot 
+        contribute to the guider). If \code{NA}, then invalid time segments are 
+        considered to be no movement segments and can contribute to the guider.
+        When HASPT.algo is "NotWorn", HASPT.ignore.invalid is automatically set to
+        NA.
         }
 
       \item{HASIB.algo}{
@@ -1320,24 +1350,16 @@ GGIR(mode = 1:5,
         number of levels.}
 
       \item{IVIS_windowsize_minutes}{
-        Numeric (default = 60).
-        Window size of the Intradaily Variability (IV) and Interdaily
-        Stability (IS) metrics in minutes, needs to be able to add up to 24 hours.}
+        This argument has been deprecated.}
 
       \item{IVIS_epochsize_seconds}{
-        Numeric (default = NULL).
-        This argument is deprecated.}
+        This argument has been deprecated.}
 
       \item{IVIS.activity.metric}{
-        Numeric (default = 2).
-        Metric used for activity calculation.
-        Value = 1, uses continuous scaled acceleration.
-        Value = 2, tries to collapse acceleration into a binary score of rest
-        versus active to try to simulate the original approach.}
+        This argument has been deprecated.}
 
       \item{IVIS_acc_threshold}{
-        Numeric (default = 20).
-        Acceleration threshold to distinguish inactive from active.}
+        This argument has been deprecated.}
 
       \item{qM5L5}{
         Numeric (default = NULL).
@@ -1373,10 +1395,14 @@ GGIR(mode = 1:5,
         over which L5M5 needs to be calculated. Now this is done with argument qwindow.}
 
       \item{cosinor}{
-        Boolean (default = FALSE). Whether to apply the cosinor analysis from the ActCR package.}
+        Boolean (default = FALSE). Whether to apply the cosinor analysis from the ActCR package in part 2.
+        In part 6 cosinor analysis is applied by default and cannot be turned off.}
         
       \item{part6CR}{
-        Boolean (default = FALSE) to indicate whether circadian rhythm analysis should be run by part 6.
+        Boolean (default = FALSE) to indicate whether circadian rhythm analysis should
+        be run by part 6, this includes: cosinor analysis, extended cosinor analysis,
+        IS, IV, and phi. Optionally this can be expanded with detrended fluctutation analysis
+        which is controlled by parameter `part6DFA`.
       }
       \item{part6HCA}{
         Boolean (default = FALSE) to indicate whether Household Co Analysis should 
@@ -1392,6 +1418,10 @@ GGIR(mode = 1:5,
         c("W1", "W-1") goes from the first till the last wakeup, c("H5", "H-5") 
         ignores the first and last 5 hours, and c("O2", "W10") goes from the second
         onset till the 10th wakeup time.
+      }
+      \item{part6DFA}{
+        Boolean (default = FALSE) to indicate whether to perform Detrended Fluctuation
+        Analysis. Turned off by default because it can be time consuming.
       }
     }
   }
@@ -1526,6 +1556,15 @@ GGIR(mode = 1:5,
           If TRUE, then reports generated with \code{visualreport = TRUE} only show
           the windows with sufficiently valid data according to \code{includedaycrit}
           when viewingwindow = 1 or \code{includenightcrit} when viewingwindow = 2}
+      \item{require_complete_lastnight_part5}{    
+          Boolean (default = FALSE).
+          When set to TRUE: The last WW window is excluded if the recording ends 
+          between midnight and 3pm, and starts on a date that is on or one day before the 
+          recording end date; The last OO and MM window are excluded if recording 
+          ends between midnight and 9am, and starts on a date that is on or one
+          day before the recording end date. This to avoid risk that recording end 
+          biases the sleep estimates for the last night.
+      }
     }
   }
 }

@@ -29,6 +29,7 @@ g.part2 = function(datadir = c(), metadatadir = c(), f0 = c(), f1 = c(),
   #---------------------------------
   # Specifying directories with meta-data and extracting filenames
   path = paste0(metadatadir,"/meta/basic/")  #values stored per long epoch, e.g. 15 minutes
+  checkMilestoneFolders(metadatadir, partNumber = 2)
   fnames = dir(path)
   if (f1 > length(fnames)) f1 = length(fnames)
   # create output folders
@@ -301,7 +302,7 @@ g.part2 = function(datadir = c(), metadatadir = c(), f0 = c(), f1 = c(),
                            "g.extractheadervars", "g.analyse.avday", "g.getM5L5", "g.IVIS",
                            "g.analyse.perday", "g.getbout", "g.analyse.perfile", "g.intensitygradient",
                            "iso8601chartime2POSIX", "extract_params", "load_params", "check_params",
-                           "correctOlderMilestoneData", "cosinorAnalyses", "extractID")
+                           "correctOlderMilestoneData", "cosinor_IS_IV_Analyses", "extractID")
       errhand = 'stop'
     }
     i = 0 # declare i because foreach uses it, without declaring it

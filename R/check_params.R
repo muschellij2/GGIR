@@ -59,7 +59,8 @@ check_params = function(params_sleep = c(), params_metrics = c(),
                        "rmc.col.acc", "interpolationType",
                        "rmc.firstrow.acc", "rmc.firstrow.header", "rmc.header.length",
                        "rmc.col.temp", "rmc.col.time",
-                       "rmc.sf", "rmc.col.wear", "rmc.noise", "frequency_tol", "rmc.scalefactor.acc")
+                       "rmc.sf", "rmc.col.wear", "rmc.noise", "frequency_tol",
+                       "rmc.scalefactor.acc", "nonwear_range_threshold")
     boolean_params = c("printsummary", "do.cal", "rmc.unsignedbit", "rmc.check4timegaps", "rmc.doresample",
                        "imputeTimegaps")
     character_params = c("backup.cal.coef", "rmc.dec", "rmc.unit.acc",
@@ -75,8 +76,7 @@ check_params = function(params_sleep = c(), params_metrics = c(),
     check_class("Raw data", params = params_rawdata, parnames = boolean_params, parclass = "boolean")
     check_class("Raw data", params = params_rawdata, parnames = character_params, parclass = "character")
 
-    if (params_rawdata[["chunksize"]] > 1.5) params_rawdata[["chunksize"]] = 1.5
-    if (params_rawdata[["chunksize"]] < 0.2) params_rawdata[["chunksize"]] = 0.2
+    if (params_rawdata[["chunksize"]] < 0.1) params_rawdata[["chunksize"]] = 0.1
   }
   if (length(params_247) > 0) {
     # iglevels and qwindow can be numeric or character, so not tested
@@ -84,7 +84,7 @@ check_params = function(params_sleep = c(), params_metrics = c(),
                        "IVIS.activity.metric", "IVIS_acc_threshold",
                        "qM5L5", "MX.ig.min.dur", "M5L5res", "winhr", "LUXthresholds", "LUX_cal_constant",
                        "LUX_cal_exponent", "LUX_day_segments", "L5M5window")
-    boolean_params = c("cosinor", "part6CR", "part6HCA")
+    boolean_params = c("cosinor", "part6CR", "part6HCA", "part6DFA")
     character_params = c("qwindow_dateformat", "part6Window")
     check_class("247", params = params_247, parnames = numeric_params, parclass = "numeric")
     check_class("247", params = params_247, parnames = boolean_params, parclass = "boolean")
@@ -104,7 +104,7 @@ check_params = function(params_sleep = c(), params_metrics = c(),
   if (length(params_cleaning) > 0) {
     numeric_params = c("includedaycrit", "ndayswindow", "data_masking_strategy", "maxdur", "hrs.del.start",
                        "hrs.del.end", "includedaycrit.part5", "minimum_MM_length.part5",
-                       "includenightcrit", "max_calendar_days")
+                       "includenightcrit", "max_calendar_days", "includecrit.part6", "includenightcrit.part5")
     boolean_params = c("excludefirstlast.part5", "do.imp", "excludefirstlast",
                        "excludefirst.part4", "excludelast.part4", "nonWearEdgeCorrection")
     character_params = c("data_cleaning_file", "TimeSegments2ZeroFile")
@@ -117,7 +117,7 @@ check_params = function(params_sleep = c(), params_metrics = c(),
     boolean_params = c("epochvalues2csv", "save_ms5rawlevels", "save_ms5raw_without_invalid",
                        "storefolderstructure", "dofirstpage", "visualreport", "week_weekend_aggregate.part5",
                        "do.part3.pdf", "outliers.only", "do.visual", "do.sibreport", "visualreport_without_invalid",
-                       "do.part2.pdf")
+                       "do.part2.pdf", "require_complete_lastnight_part5")
     character_params = c("save_ms5raw_format", "timewindow", "sep_reports", "sep_config",
                          "dec_reports", "dec_config")
     check_class("output", params = params_output, parnames = numeric_params, parclass = "numeric")
@@ -177,8 +177,11 @@ check_params = function(params_sleep = c(), params_metrics = c(),
   
   if (length(params_sleep) > 0) {
     if (length(params_sleep[["def.noc.sleep"]]) != 2) {
-      if (params_sleep[["HASPT.algo"]] %in% c("HorAngle", "NotWorn") == FALSE) {
+      if (params_sleep[["HASPT.algo"]][1] %in% c("HorAngle", "NotWorn") == FALSE) {
         params_sleep[["HASPT.algo"]] = "HDCZA"
+      }
+      if (length(params_sleep[["HASPT.algo"]]) == 2 && params_sleep[["HASPT.algo"]][2] == "NotWorn") {
+        params_sleep[["HASPT.algo"]] = params_sleep[["HASPT.algo"]][2:1] # NotWorn is expected to be first
       }
     } else if (length(params_sleep[["def.noc.sleep"]]) == 2) {
       params_sleep[["HASPT.algo"]] = "notused"
@@ -201,13 +204,13 @@ check_params = function(params_sleep = c(), params_metrics = c(),
   
   if (length(params_general) > 0 & length(params_metrics) > 0 & length(params_sleep) > 0) {
     if (params_general[["sensor.location"]] == "hip" &&
-        params_sleep[["HASPT.algo"]] %in% c("notused", "NotWorn") == FALSE) {
+        params_sleep[["HASPT.algo"]][1] %in% c("notused", "NotWorn") == FALSE) {
       if (params_metrics[["do.anglex"]] == FALSE | params_metrics[["do.angley"]] == FALSE | params_metrics[["do.anglez"]] == FALSE) {
         warning(paste0("\nWhen working with hip data all three angle metrics are needed,",
                        "so GGIR now auto-sets arguments do.anglex, do.angley, and do.anglez to TRUE."), call. = FALSE)
         params_metrics[["do.anglex"]] = params_metrics[["do.angley"]] = params_metrics[["do.anglez"]] = TRUE
       }
-      if (params_sleep[["HASPT.algo"]] != "HorAngle") {
+      if (length(params_sleep[["HASPT.algo"]]) == 1 && params_sleep[["HASPT.algo"]][1] != "HorAngle") {
         warning("\nChanging HASPT.algo value to HorAngle, because sensor.location is set as hip", call. = FALSE)
         params_sleep[["HASPT.algo"]] = "HorAngle"; params_sleep[["def.noc.sleep"]] = 1
       }
@@ -231,12 +234,12 @@ check_params = function(params_sleep = c(), params_metrics = c(),
       params_sleep[["def.noc.sleep"]] = 1
     }
     
-    if (params_sleep[["HASPT.algo"]] == "HorAngle" & params_sleep[["sleepwindowType"]] != "TimeInBed") {
+    if (params_sleep[["HASPT.algo"]][1] == "HorAngle" & params_sleep[["sleepwindowType"]] != "TimeInBed") {
       warning("\nHASPT.algo is set to HorAngle, therefore auto-updating sleepwindowType to TimeInBed", call. = FALSE)
       params_sleep[["sleepwindowType"]] = "TimeInBed"
     }
     
-    if (length(params_sleep[["loglocation"]]) == 0 & params_sleep[["HASPT.algo"]] != "HorAngle" & params_sleep[["sleepwindowType"]] != "SPT") {
+    if (length(params_sleep[["loglocation"]]) == 0 & params_sleep[["HASPT.algo"]][1] != "HorAngle" & params_sleep[["sleepwindowType"]] != "SPT") {
       warning("\nAuto-updating sleepwindowType to SPT because no sleeplog used and neither HASPT.algo HorAngle used.", call. = FALSE)
       params_sleep[["sleepwindowType"]] = "SPT"
     }
@@ -274,11 +277,21 @@ check_params = function(params_sleep = c(), params_metrics = c(),
                                                      replacement = "/", x = params_cleaning[["data_cleaning_file"]])
     }
     if (params_cleaning[["includedaycrit.part5"]] < 0) {
-      warning("\nNegative value of includedaycrit.part5 is not allowed, please change.")
+      stop("\nNegative value of includedaycrit.part5 is not allowed, please change.")
     } else if (params_cleaning[["includedaycrit.part5"]]  > 24) {
-      warning(paste0("\nIncorrect value of includedaycrit.part5, this should be",
+      stop(paste0("\nIncorrect value of includedaycrit.part5, this should be",
                      " a fraction of the day between zero and one or the number ",
                      "of hours in a day."))
+    }
+    if (params_cleaning[["includenightcrit.part5"]] < 0) {
+      stop("\nNegative value of includenightcrit.part5 is not allowed, please change.")
+    } else if (params_cleaning[["includenightcrit.part5"]]  > 24) {
+      stop(paste0("\nIncorrect value of includenightcrit.part5, this should be",
+                     " a fraction of the day between zero and one or the number ",
+                     "of hours in a day."))
+    }
+    if (any(params_cleaning[["includecrit.part6"]] < 0) | any(params_cleaning[["includecrit.part6"]] > 1)) {
+      stop("Values of includecrit.part6 are not in the range [0, 1]. Please fix.")
     }
   }
   if (length(params_phyact) > 0) {
@@ -342,7 +355,7 @@ check_params = function(params_sleep = c(), params_metrics = c(),
       }
     }
     # params 247 & params output
-    if (params_247[["part6HCA"]] == TRUE) {
+    if (params_247[["part6HCA"]] == TRUE || params_247[["part6CR"]] == TRUE) {
       # Add RData because part 6 will need it
       params_output[["save_ms5raw_format"]] = unique(c(params_output[["save_ms5raw_format"]], "RData"))
       params_output[["save_ms5rawlevels"]] = TRUE
@@ -368,7 +381,7 @@ check_params = function(params_sleep = c(), params_metrics = c(),
   }
   
   if (length(params_general) > 0 & length(params_sleep) > 0) {
-    if (params_sleep[["HASPT.algo"]] == "HorAngle") {
+    if (params_sleep[["HASPT.algo"]][1] == "HorAngle") {
       # Not everywhere in the code we check that when HASPT.algo is HorAngle, sensor.location is hip.
       # However, the underlying assumption is that they are linked. Even if a study would
       # use a waist or chest worn sensor we refer to it as hip as the orientation and need

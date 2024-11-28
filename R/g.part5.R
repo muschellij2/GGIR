@@ -4,6 +4,7 @@ g.part5 = function(datadir = c(), metadatadir = c(), f0=c(), f1=c(),
                    params_cleaning = c(), params_output = c(),
                    params_general = c(), verbose = TRUE, ...) {
   options(encoding = "UTF-8")
+  filename_dir = NULL
   # This function called by function GGIR
   # and aims to combine all the milestone output from the previous parts
   # in order to facilitate a varierty of analysis on time-use, interactions
@@ -30,10 +31,8 @@ g.part5 = function(datadir = c(), metadatadir = c(), f0=c(), f1=c(),
   params_general = params$params_general
   #======================================================================
   # create new folder (if not existent) for storing milestone data
+  checkMilestoneFolders(metadatadir, partNumber = 5)
   ms5.out = "/meta/ms5.out"
-  if (!file.exists(paste(metadatadir, ms5.out, sep = ""))) {
-    dir.create(file.path(metadatadir, ms5.out))
-  }
   if (params_output[["save_ms5rawlevels"]] == TRUE | params_output[["do.sibreport"]] == TRUE) {
     ms5.outraw = "/meta/ms5.outraw"
     if (file.exists(paste(metadatadir, ms5.outraw, sep = ""))) {
@@ -109,6 +108,7 @@ g.part5 = function(datadir = c(), metadatadir = c(), f0=c(), f1=c(),
                         extractfilenames, referencefnames, folderstructure,
                         fullfilenames, foldername, ffdone, verbose) {
     tail_expansion_log =  NULL
+    filename_dir = NULL # to be loaded
     fnames.ms1 = dir(paste(metadatadir, "/meta/basic", sep = ""))
     fnames.ms2 = dir(paste(metadatadir, "/meta/ms2.out", sep = ""))
     fnames.ms4 = dir(paste(metadatadir, "/meta/ms4.out", sep = ""))
@@ -172,6 +172,7 @@ g.part5 = function(datadir = c(), metadatadir = c(), f0=c(), f1=c(),
         # convert to character/numeric if stored as factor in metashort and metalong
         M$metashort = correctOlderMilestoneData(M$metashort)
         M$metalong = correctOlderMilestoneData(M$metalong)
+        filename = filename_dir # object comes from load() call above
         # load output g.part3
         longitudinal_axis = NULL # initialise var that is part of ms3.out
         load(paste0(metadatadir, "/meta/ms3.out/", fnames.ms3[i]))
@@ -259,8 +260,14 @@ g.part5 = function(datadir = c(), metadatadir = c(), f0=c(), f1=c(),
                               desiredtz = params_general[["desiredtz"]],
                               sibDefinition = sibDef,
                               nightsi)
-          # Fix missing nights in part 4 data:
-          summarysleep_tmp2 = g.part5.fixmissingnight(summarysleep_tmp2, sleeplog = sleeplog, ID)
+          if (nrow(summarysleep_tmp2) > 0) {
+            if (!all(is.na(summarysleep_tmp$sleepparam))) {
+              # Fix missing nights in part 4 data:
+              summarysleep_tmp2 = g.part5.fixmissingnight(summarysleep_tmp2, sleeplog = sleeplog, ID)
+            } else {
+              summarysleep_tmp2 = summarysleep_tmp2[-which(is.na(summarysleep_tmp$sleepparam)), ]
+            }
+          }
           #Initialise diur variable, which will  indicate the diurnal rhythm: 0 if wake/daytime, 1 if sleep/nighttime
           ts$diur = 0
           if (nrow(summarysleep_tmp2) > 0) {
@@ -480,9 +487,10 @@ g.part5 = function(datadir = c(), metadatadir = c(), f0=c(), f1=c(),
                             }
                             if (timewindowi == "MM" & si > 1) { # because first segment is always full window
                               if (("segment" %in% colnames(ts)) == FALSE) ts$segment = NA
-                              ts$segment[segStart:segEnd] = si
+                              if (!is.na(segStart) && !is.na(segEnd)) {
+                                ts$segment[segStart:segEnd] = si
+                              }
                             }
-                            
                             # Already store basic information about the file
                             # in the output matrix: 
                             dsummary[si,fi:(fi + 1)] = c(ID, fnames.ms3[i])
@@ -600,9 +608,12 @@ g.part5 = function(datadir = c(), metadatadir = c(), f0=c(), f1=c(),
                                            rawlevels_fname = rawlevels_fname,
                                            DaCleanFile = DaCleanFile,
                                            includedaycrit.part5 = params_cleaning[["includedaycrit.part5"]],
+                                           includenightcrit.part5 = params_cleaning[["includenightcrit.part5"]],
                                            ID = ID,
                                            params_output = params_output,
-                                           params_247 = params_247)
+                                           params_247 = params_247,
+                                           Lnames = Lnames, timewindow = timewindowi,
+                                           filename = filename)
                   }
                 }
               }
@@ -664,7 +675,9 @@ g.part5 = function(datadir = c(), metadatadir = c(), f0=c(), f1=c(),
                 if (length(GGIRversion) != 1) GGIRversion = sessionInfo()$otherPkgs$GGIR$Version
               }
               output$GGIRversion = GGIRversion
-              save(output, tail_expansion_log, GGIRversion,
+              # Capture final timestamp to ease filtering last window in g.report.part5
+              last_timestamp = time_POSIX[length(time_POSIX)] 
+              save(output, tail_expansion_log, GGIRversion, last_timestamp,
                    file = paste(metadatadir, ms5.out, "/", fnames.ms3[i], sep = ""))
             }
           }

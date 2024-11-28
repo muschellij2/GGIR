@@ -79,7 +79,7 @@ g.impute = function(M, I, params_cleaning = c(), desiredtz = "",
       endTurnZero = which(timelinePOSIX == TimeSegments2Zero$windowend[kli])
       r1long[startTurnZero:endTurnZero] = 0
       # Force ENMO and other acceleration metrics to be zero for these intervals
-      M$metashort[startTurnZero:endTurnZero,which(colnames(M$metahosrt) %in% c("timestamp","anglex","angley","anglez") == FALSE)] = 0
+      M$metashort[startTurnZero:endTurnZero,which(colnames(M$metashort) %in% c("timestamp","anglex","angley","anglez") == FALSE)] = 0
     }
     # collaps r1long (short epochs) back to r1 (long epochs)
     r1longc = cumsum(c(0,r1long))
@@ -354,19 +354,31 @@ g.impute = function(M, I, params_cleaning = c(), desiredtz = "",
   for (mi in 2:ncol(metashort)) {# generate 'average' day for each variable
     # The average day is used for imputation and defined relative to the starttime of the measurement
     # irrespective of dayborder as used in other parts of GGIR
-    metrimp = metr = as.numeric(as.matrix(metashort[, mi]))
+    metr = as.numeric(as.matrix(metashort[, mi]))
     is.na(metr[which(r5long != 0)]) = T #turn all values of metr to na if r5long is different to 0 (it now leaves the expanded time with expand_tail_max out of the averageday calculation)
     imp = matrix(NA,wpd,ceiling(length(metr)/wpd)) #matrix used for imputation of seconds
     ndays = ncol(imp) #number of days (rounded upwards)
     nvalidsec = matrix(0,wpd,1)
     dcomplscore = length(which(r5 == 0)) / length(r5)
     if (ndays > 1 ) { # only do imputation if there is more than 1 day of data #& length(which(r5 == 1)) > 1
+      # all days except last one
       for (j in 1:(ndays - 1)) {
         imp[,j] = as.numeric(metr[(((j - 1)*wpd) + 1):(j*wpd)])
       }
+      # last day
       lastday = metr[(((ndays - 1)*wpd) + 1):length(metr)]
       imp[1:length(lastday),ndays] = as.numeric(lastday)
-      imp3 = rowMeans(imp, na.rm = TRUE)
+      if (colnames(metashort)[mi] == "step_count") {
+        # Median per row, which equals to median for one time point in the 'average' day
+        # (median day would be a better term in this context)
+        # chances are high that this will often be zero, because a person
+        # would have to walk on a certain time point in the day for more than half of
+        # each day in the to get a median above zero
+        imp3 = apply(imp, 1, median, na.rm = TRUE)
+      } else {
+        # mean per row, which equals to mean or one time point in the 'average' day
+        imp3 = rowMeans(imp, na.rm = TRUE)
+      }
       dcomplscore = length(which(is.nan(imp3) == F | is.na(imp3) == F)) / length(imp3)
       
       if (length(imp3) < wpd)  {
@@ -384,8 +396,9 @@ g.impute = function(M, I, params_cleaning = c(), desiredtz = "",
           imp[missing,j] = imp3[missing]
         }
       }
+      # imp is now the imputed time series
       dim(imp) = c(length(imp),1)
-      #      imp = imp[-c(which(is.na(as.numeric(as.character(imp))) == T))]
+      # but do not use imp for expanded time
       toimpute = which(r5long != -1)       # do not impute the expanded time with expand_tail_max_hours
       metashort[toimpute, mi] = as.numeric(imp[toimpute]) #to cut off the latter part of the last day used as a dummy data
     } else {
